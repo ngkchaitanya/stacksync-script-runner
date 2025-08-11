@@ -8,6 +8,14 @@ A small Flask API that runs user-submitted Python in a sandbox and returns the `
 * Deployable to Cloud Run
 * Fallback mode on Cloud Run when gVisor blocks nsjail syscalls
 
+## One-liner local run
+
+Pulls from Artifact Registry and runs without building:
+
+```bash
+docker run -p 8080:8080 -e PORT=8080 us-central1-docker.pkg.dev/misc-dev-457722/ss-exec-repo/ss-exec:v3
+```
+
 ## Quick start (local, with nsjail)
 
 ```bash
@@ -177,63 +185,8 @@ Optional longer timeout
 {"script":"def main():\n  import time; time.sleep(2); return {\"done\": True}", "timeout": 25}
 ```
 
-## Local development tips
-
-* Rebuild local image after code changes:
-
-```bash
-docker build -t ss-exec:v3 .
-docker run -p 8081:8080 -e PORT=8080 ss-exec:v3
-```
-
-* Force fallback mode locally:
-
-```bash
-docker run -p 8082:8080 -e PORT=8080 -e USE_NSJAIL=0 ss-exec:v3
-```
-
-## .dockerignore
-
-Add this to keep builds fast:
-
-```
-.venv
-.git
-__pycache__/
-*.pyc
-*.pyo
-*.log
-node_modules
-.DS_Store
-.pytest_cache/
-build/
-dist/
-```
-
 ## Known limitations
 
 * `main()` must return JSON-serializable data. I intentionally reject other types.
 * Third-party packages are limited to what is baked into the image. Installing packages at runtime is blocked.
 * On Cloud Run, nsjail is disabled. If full jail semantics are required in production, run this image on a VM or GKE Standard with the needed capabilities.
-
-## Troubleshooting
-
-* Port already allocated
-  Use a different host port, for example `-p 8081:8080`.
-
-* NameError mentioning `true`
-  Use Python constants: `True`, `False`, `None`.
-
-* Numpy slow to import locally
-  Increase `time_limit` in `nsjail.cfg` and the `timeout` field in the request.
-
-## Submission checklist
-
-* GitHub repo URL
-* Cloud Run URL
-* README includes:
-
-  * local docker run
-  * Cloud Run example with your URL
-  * note about nsjail fallback on Cloud Run
-* Time spent estimate
