@@ -10,21 +10,31 @@ app = Flask(__name__)
 MAX_SCRIPT_BYTES = 200_000
 DEFAULT_TIMEOUT_SEC = 20
 
+# Prefer the interpreter running the API, fall back cleanly
 PYTHON_BIN = sys.executable
 if not os.path.exists(PYTHON_BIN):
     PYTHON_BIN = shutil.which("python3") or shutil.which("python") or "/usr/bin/python3"
+
 NSJAIL_BIN = shutil.which("nsjail") or "nsjail"
 
-# absolute paths so they work both inside and outside the jail
+# Absolute paths so they work both inside and outside the jail
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-NSJAIL_CFG = os.path.join(BASE_DIR, "nsjail.cfg")
+
+# Pick config by env. Default to light for Cloud Run compatibility.
+# NSJAIL_MODE = os.getenv("NSJAIL_MODE", "light")  # "light" or "full" (anything non-"light" uses full)
+# NSJAIL_CFG = os.path.join(
+#     BASE_DIR,
+#     "nsjail-light.cfg" if NSJAIL_MODE == "light" else "nsjail.cfg"
+# )
+NSJAIL_CFG = os.path.join(
+    BASE_DIR,
+    "nsjail-light.cfg")
+
 RUNNER_PATH = os.path.join(BASE_DIR, "app", "runner.py")
 
-# toggle nsjail on or off
-USE_NSJAIL = (os.getenv("USE_NSJAIL", "1") == "1")
-# on Cloud Run, auto-disable since gVisor blocks a required prctl
-if os.getenv("K_SERVICE"):
-    USE_NSJAIL = False
+# Toggle nsjail on or off at runtime
+USE_NSJAIL = os.getenv("USE_NSJAIL", "1") == "1"
+# Do not auto-disable on Cloud Run. We rely on the light config there.
 
 def validate_body(body):
     if not isinstance(body, dict):
@@ -56,19 +66,27 @@ def execute():
         script_text = body["script"]
         timeout_sec = get_timeout(body)
 
-        # write script to /tmp so it is visible in the jail
+        # Write script to /tmp so it is visible to the jailed process
         with tempfile.NamedTemporaryFile("w", delete=False, dir="/tmp", suffix=".py") as tf:
             tf.write(script_text)
             script_path = tf.name
 
         try:
-            cmd = []
             if USE_NSJAIL:
-                cmd = [NSJAIL_BIN, "-Mo", "--config", NSJAIL_CFG, "--", PYTHON_BIN, RUNNER_PATH, script_path]
+                cmd = [
+                    NSJAIL_BIN,
+                    "-C", NSJAIL_CFG,
+                    "--", PYTHON_BIN, RUNNER_PATH, script_path
+                ]
             else:
                 cmd = [PYTHON_BIN, RUNNER_PATH, script_path]
-                
-            print(f"EXEC_MODE={ 'nsjail' if USE_NSJAIL else 'no-nsjail' }", flush=True)
+
+            print(
+                f"EXEC_MODE={'nsjail' if USE_NSJAIL else 'no-nsjail'} "
+                f"CFG={os.path.basename(NSJAIL_CFG)} "
+                f"PYTHON_BIN={PYTHON_BIN}",
+                flush=True
+            )
 
             proc = subprocess.run(
                 cmd,

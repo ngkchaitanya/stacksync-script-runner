@@ -13,7 +13,7 @@ A small Flask API that runs user-submitted Python in a sandbox and returns the `
 Pulls from Artifact Registry and runs without building:
 
 ```bash
-docker run -p 8080:8080 -e PORT=8080 us-central1-docker.pkg.dev/misc-dev-457722/ss-exec-repo/ss-exec:v4
+docker run -p 8080:8080 -e PORT=8080 us-central1-docker.pkg.dev/misc-dev-457722/ss-exec-repo/ss-exec:v5
 ```
 
 ## Quick start (local, with nsjail)
